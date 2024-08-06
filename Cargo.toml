@@ -1,0 +1,19 @@
+[package]
+name = "time-tally"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.7.5", features = ["tokio", "http1"] }
+chrono = "0.4.38"
+clap = { version = "4.5.7", features = ["derive"] }
+computus = { version = "1.1.0", features = ["chrono"] }
+config = "0.14.0"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.117"
+tokio = { version = "1.38.0", features = ["macros", "rt-multi-thread", "signal"] }
+tower = { version = "0.4.13", features = ["make"] }
+tower-http = { version = "0.5.2", features = ["trace"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+

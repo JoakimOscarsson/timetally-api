@@ -1,0 +1,154 @@
+name: ci
+run-name: CI
+on: 
+  pull_request:
+    branches:
+      - main
+  push:
+
+jobs:
+#  static-analysis: # TODO: Look at having each of these jobs as separate workflows
+#    name: Static Analysis
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Check out repository code
+#        uses: actions/checkout@v4
+#
+#      - name: Vulnerability Scan
+#        run: echo "src vulnerability scan TBD"
+  
+    # name: Docker demo
+    # runs-on: ubuntu-latest
+    # container:
+    #   image: debian:latest
+    # steps:
+    #   - run: apt-get update && apt-get install -y lsb-release
+    #   # tmp:
+    #   - run: apt-get install iputils-ping -y
+    #   # - run: ping runner2
+    #   # - run: ping 192.168.64.1.
+    #   # - run: ping google.se
+    #   # ---
+    #   - run: lsb_release -a
+    #   # Install docker
+    #   - run: apt-get install ca-certificates curl -y
+    #   - run: install -m 0755 -d /etc/apt/keyrings
+    #   - run: curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+    #   - run: chmod a+r /etc/apt/keyrings/docker.asc
+    #   - run: echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    #   - run: apt-get update
+    #   - run: apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+
+    #   # Build contianer
+    #   - run: docker
+    #   # Trying to log in to registry:
+    #   - run: docker login 192.168.64.1:3000 -u ${{ secrets.MY_GITEA_USER }} -p ${{ secrets.MY_GITEA_PASS }}
+    #   - run: docker push 192.168.64.1:3000
+      
+
+
+  # test:
+  #   name: Test
+  #   needs: docker-demo
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Check out repository
+  #       uses: actions/checkout@v4
+
+  #     - name: Install Rust toolchain
+  #       uses: dtolnay/rust-toolchain@stable # TODO: How to pin this version??
+
+  #     - name: Install Clippy
+  #       run: rustup component add clippy
+
+  #     - name: Static check
+  #       run: cargo clippy -- -D clippy::all
+
+  #     - name: Test
+  #       run: cargo test
+
+  build:
+    name: Build
+    #For docker tests:
+    runs-on: ubuntu-latest
+    #needs: test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable # TODO: How to pin this version?
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Read package name
+        uses: SebRollen/toml-action@v1.2.0
+        id: read_toml
+        with:
+          file: 'Cargo.toml'
+          field: 'package.name'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.read_toml.outputs.value }}-${{ github.sha }}
+          path: "target/release/${{ steps.read_toml.outputs.value }}"
+          retention-days: 1
+          compression-level: 1
+
+      # testing to make a dockefile
+      - run: apt-get update
+      - run: apt-get install ca-certificates curl -y
+      - run: install -m 0755 -d /etc/apt/keyrings
+      - run: curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+      - run: chmod a+r /etc/apt/keyrings/docker.asc
+      - run: echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \tee /etc/apt/sources.list.d/docker.list > /dev/null
+      - run: apt-get update
+      - run: apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+
+      - name: Disable Docker TLS verification (use with caution)
+        run: |
+          mkdir -p $HOME/.docker
+          echo '{ "insecure-registries" : ["192.168.64.1:3000"], "disable-legacy-registry": true }' > /etc/docker/daemon.json
+      - run: chmod -R 777 /etc/docker/daemon.json
+      - run: systemctl restart docker
+      # # Enable unsecure registry
+      # - name: Configure Docker daemon
+      #   run: |
+      #     mkdir -p $HOME/.docker
+      #     echo '{"insecure-registries":["192.168.64.1:3000"]}' > $HOME/.docker/config.json
+      
+      #login
+      - name: Log in to Gitea Container Registry
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          echo $GITEA_TOKEN | docker login 192.168.64.1:3000 -u joakim --password-stdin
+
+      # Build contianer
+      - run: docker build -t 192.168.64.1/joakim/timetally:latest .
+      - run: docker push 192.168.64.1/joakim/timetally:latest
+      # Trying to log in to registry:
+      #- run: docker login 192.168.64.1:3000 -u ${{ secrets.MY_GITEA_USER }} -p ${{ secrets.MY_GITEA_PASS }}
+      #- run: docker push 192.168.64.1:3000
+
+  # package: 
+  #   name: Package
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - name: Download artifact
+  #       uses: actions/download-artifact@3
+  #       with:
+  #         name:  
+
+
+
+#        run: echo "Continer Build TBD"
+#
+#      - name: Container Vulnerability Scan
+#        run: echo "Continer vulnerability scan TBD"
+#
+#      - name: Container Upload
+#        run: echo "Continer upload TBD"

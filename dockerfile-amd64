@@ -1,0 +1,102 @@
+# # Use a smaller base image for the final container
+# FROM debian:bookworm-slim
+#
+# WORKDIR /usr/src/app
+#
+# COPY target/release/time-tally .
+#
+# CMD ["./time-tally", "-p", "5050"]
+#
+# EXPOSE 5050
+
+
+# # Use the official Rust image as a base
+# FROM rust:1.79 as builder
+
+# # Set the working directory
+# WORKDIR /usr/src/app
+
+# # Copy the Cargo.toml and Cargo.lock files to the working directory
+# COPY Cargo.toml Cargo.lock ./
+
+# # Copy the source code to the working directory
+# COPY src ./src
+
+# # Build the application
+# RUN cargo build --release
+
+
+# # Use a smaller base image for the final container
+# FROM debian:bookworm-slim
+
+# WORKDIR /usr/src/app
+
+# COPY --from=builder /usr/src/app/target/release/time-tally .
+
+# CMD ["./time-tally", "-p", "5050"]
+
+# EXPOSE 5050
+
+
+
+
+
+#NEW: 
+## Build stage
+#FROM --platform=$BUILDPLATFORM rust:1.79 AS builder
+#WORKDIR /usr/src/app
+#COPY Cargo.toml Cargo.lock ./
+#COPY src ./src
+#RUN cargo build --release
+#
+## Production stage
+#FROM --platform=$TARGETPLATFORM debian:bookworm-slim
+#WORKDIR /usr/src/app
+#COPY --from=builder /usr/src/app/target/release/time-tally .
+#EXPOSE 80
+#CMD ["./time-tally", "-p", "80"]
+#--------------------------------------------------------
+
+
+## Build stage
+#FROM --platform=$BUILDPLATFORM rust:1.79 AS builder
+#WORKDIR /usr/src/app
+#COPY Cargo.toml Cargo.lock ./
+#COPY src ./src
+#RUN rustup target add x86_64-unknown-linux-gnu
+#RUN cargo build --release --target x86_64-unknown-linux-gnu
+#
+## Production stage
+#FROM --platform=$TARGETPLATFORM debian:bookworm-slim
+#WORKDIR /usr/src/app
+#COPY --from=builder /usr/src/app/target/x86_64-unknown-linux-gnu/release/time-tally .
+#EXPOSE 80
+#CMD ["./time-tally", "-p", "80"]
+
+
+# Build stage
+FROM --platform=$BUILDPLATFORM rust:1.79 AS builder
+WORKDIR /usr/src/app
+
+# Install cross-compilation tools
+RUN apt-get update && apt-get install -y \
+    gcc-x86-64-linux-gnu \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up cross-compilation environment
+ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=x86_64-linux-gnu-gcc \
+    CC_x86_64_unknown_linux_gnu=x86_64-linux-gnu-gcc \
+    CXX_x86_64_unknown_linux_gnu=x86_64-linux-gnu-g++
+
+# Copy and build the project
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+RUN rustup target add x86_64-unknown-linux-gnu
+RUN cargo build --release --target x86_64-unknown-linux-gnu
+
+# Production stage
+FROM --platform=$TARGETPLATFORM debian:bookworm-slim
+WORKDIR /usr/src/app
+COPY --from=builder /usr/src/app/target/x86_64-unknown-linux-gnu/release/time-tally .
+EXPOSE 80
+CMD ["./time-tally", "-p", "80"]
